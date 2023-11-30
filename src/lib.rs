@@ -192,7 +192,7 @@ use wasm_bindgen::JsCast;
 
 #[cfg(target_arch = "wasm32")]
 pub fn get_current_time() -> f64 {
-    web_sys::window().unwrap().performance().unwrap().now()
+    web_sys::window().unwrap().performance().unwrap().now() / 1000.0
 }
 
 #[cfg(not(target_arch = "wasm32"))]
