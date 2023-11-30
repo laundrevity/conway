@@ -1,12 +1,15 @@
 use eframe::egui::{self, Color32, Rect, Vec2};
 use eframe::App;
-use std::time::{Duration, Instant};
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
+#[cfg(not(target_arch = "wasm32"))]
 use once_cell::sync::Lazy;
 
 #[cfg(not(target_arch = "wasm32"))]
 static START_TIME: Lazy<Instant> = Lazy::new(Instant::now);
 
 pub struct GameOfLifeApp {
+    grid_length: usize,
     grid: Vec<Vec<bool>>, // true for alive, false for dead
     is_playing: bool, // track if the game is playing, e.g. evolving
     last_update: f64,
@@ -15,8 +18,11 @@ pub struct GameOfLifeApp {
 
 impl GameOfLifeApp {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+        let grid_length = 32;
+        let grid = vec![vec![false; grid_length + 2]; grid_length + 2];
         Self {
-            grid: vec![vec![false; 18]; 18],
+            grid_length,
+            grid,
             is_playing: false,
             last_update: get_current_time(),
             update_frequency: 0.5,
@@ -25,7 +31,7 @@ impl GameOfLifeApp {
 
     fn draw_grid(&mut self, ui: &mut egui::Ui) {
         let cell_size = 20.0; // size of each cell in the grid
-        let grid_size = cell_size * 16.0; // total size of the grid
+        let grid_size = cell_size * (self.grid_length as f32); // total size of the grid
         let (response, painter) = ui.allocate_painter(Vec2::splat(grid_size), egui::Sense::click());
     
         // Check for the click and toggle cell state
@@ -34,7 +40,7 @@ impl GameOfLifeApp {
                 // Calculate which cell was clicked
                 let x = ((mouse_pos.x - response.rect.left()) / cell_size).floor() as usize;
                 let y = ((mouse_pos.y - response.rect.top()) / cell_size).floor() as usize;
-                if x < 16 && y < 16 {
+                if x < self.grid_length && y < self.grid_length {
                     // Flip the state of the clicked cell
                     self.grid[x][y] = !self.grid[x][y];
                 }
@@ -45,8 +51,8 @@ impl GameOfLifeApp {
         let grid_line_stroke = egui::Stroke::new(1.0, Color32::WHITE);
 
         // Draw only central part of grid
-        for x in 1..17 {
-            for y in 1..17 {
+        for x in 1..(self.grid_length+1) {
+            for y in 1..(self.grid_length+1) {
                 let rect = Rect::from_min_size(
                     response.rect.min + Vec2::new(x as f32 * cell_size, y as f32 * cell_size), 
                     Vec2::splat(cell_size),
@@ -65,8 +71,8 @@ impl GameOfLifeApp {
     fn update_game_state(&mut self) {
         let mut new_grid = self.grid.clone();
 
-        for x in 0..18 {
-            for y in 0..18 {
+        for x in 0..(self.grid_length + 2) {
+            for y in 0..(self.grid_length + 2) {
                 let alive_neighbors = self.count_alive_neighbors(x, y);
                 
                 if self.grid[x][y] {
@@ -93,7 +99,7 @@ impl GameOfLifeApp {
                 let nj = y as isize + j - 1; // y-index of j-th offset (so for i=0 is above, j=2 is below)
 
                 // Check if the neighbor is within grid bounds, including "buffer"
-                if ni >= 0 && ni < 18 as isize && nj >= 0 && nj < 18 as isize {
+                if ni >= 0 && ni < (self.grid_length + 2) as isize && nj >= 0 && nj < (self.grid_length + 2) as isize {
                     if self.grid[ni as usize][nj as usize] {
                         count += 1;
                     }
@@ -105,7 +111,7 @@ impl GameOfLifeApp {
     }
 
     fn clear_grid(&mut self) {
-        self.grid = vec![vec![false; 18]; 18];
+        self.grid = vec![vec![false; self.grid_length + 2]; self.grid_length + 2];
     }
 }
 
@@ -184,11 +190,6 @@ mod wasm {
         }
     }
 }
-
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::JsCast;
 
 #[cfg(target_arch = "wasm32")]
 pub fn get_current_time() -> f64 {
