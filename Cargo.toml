@@ -1,3 +1,6 @@
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [package]
 name = "game_of_life"
 version = "0.1.0"
@@ -5,3 +8,19 @@ edition = "2021"
 
 [dependencies]
 eframe = "0.24.0"
+log = "0.4.20"
+once_cell = "1.18.0"
+wasm-bindgen = "0.2.89"
+wasm-bindgen-futures = "0.4.39"
+
+# This section is for conditional compilation
+# It includes eframe only when NOT targeting WASM
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+eframe = { version = "0.24.0", default-features = false }
+
+# Enable the performance API
+[dependencies.web-sys]
+version = "0.3"
+features = [
+    "Performance"
+]
