@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use eframe::egui::{self, Color32, Rect, Vec2};
 use eframe::App;
 #[cfg(not(target_arch = "wasm32"))]
@@ -14,18 +15,23 @@ pub struct GameOfLifeApp {
     is_playing: bool, // track if the game is playing, e.g. evolving
     last_update: f64,
     update_frequency: f32,
+    history: VecDeque<Vec<Vec<bool>>>,
+    history_index: usize, // Current index in the history
 }
 
 impl GameOfLifeApp {
     pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         let grid_length = 32;
         let grid = vec![vec![false; grid_length + 2]; grid_length + 2];
+        let history = VecDeque::new();
         Self {
             grid_length,
             grid,
             is_playing: false,
             last_update: get_current_time(),
             update_frequency: 0.5,
+            history,
+            history_index: 0
         }
     }
 
@@ -43,6 +49,9 @@ impl GameOfLifeApp {
                 if x < self.grid_length && y < self.grid_length {
                     // Flip the state of the clicked cell
                     self.grid[x][y] = !self.grid[x][y];
+
+                    // Reset history
+                    self.reset_history();
                 }
             }
         }
@@ -70,6 +79,13 @@ impl GameOfLifeApp {
 
     fn update_game_state(&mut self) {
         let mut new_grid = self.grid.clone();
+
+        self.history.push_back(self.grid.clone());
+        self.history_index = self.history.len() - 1;
+        // if self.history.len() > 1024 {
+        //     self.history.pop_front(); // Remove oldest state if history is too long
+        // }
+
 
         for x in 0..(self.grid_length + 2) {
             for y in 0..(self.grid_length + 2) {
@@ -113,6 +129,25 @@ impl GameOfLifeApp {
     fn clear_grid(&mut self) {
         self.grid = vec![vec![false; self.grid_length + 2]; self.grid_length + 2];
     }
+
+    fn resize_grid(&mut self, new_size: usize) {
+        let mut new_grid = vec![vec![false; new_size + 2]; new_size + 2];
+
+        for x in 1..=self.grid_length.min(new_size) {
+            for y in 1..=self.grid_length.min(new_size) {
+                new_grid[x][y] = self.grid[x][y];
+            }
+        }
+
+        self.grid = new_grid;
+        self.grid_length = new_size;
+    }
+
+    fn reset_history(&mut self) {
+        self.history.clear();
+        self.history.push_back(self.grid.clone());
+        self.history_index = 0;
+    }
 }
 
 impl App for GameOfLifeApp {
@@ -138,6 +173,24 @@ impl App for GameOfLifeApp {
                 ui.label(if self.is_playing { "Playing" } else { "Paused" });
 
                 ui.add(egui::Slider::new(&mut self.update_frequency, 0.1..=2.0).text("Update frequency (s)"));
+
+                // Add a slider for grid length
+                let mut new_grid_length = self.grid_length as i32;
+                ui.add(egui::Slider::new(&mut new_grid_length, 10..=100).text("Grid Edge Length"));
+                if new_grid_length != self.grid_length as i32 {
+                    self.resize_grid(new_grid_length as usize);
+                    self.is_playing = false;
+                }
+
+                let history_len = self.history.len();
+                if history_len > 0 {
+                    let mut history_slider_value = self.history_index as i32;
+                    ui.add(egui::Slider::new(&mut history_slider_value, 0..=(history_len as i32 - 1)).text("History"));
+                    if history_slider_value != self.history_index as i32 {
+                        self.history_index = history_slider_value as usize;
+                        self.grid = self.history[self.history_index].clone();
+                    }
+                }
             });
 
             let now = get_current_time();
