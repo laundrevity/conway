@@ -156,7 +156,37 @@ impl App for GameOfLifeApp {
             ui.heading("Conway's Game of Life");
             self.draw_grid(ui);
 
-            // Play and Pause buttons
+            // Use vertical layout for sliders
+            ui.vertical(|ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Update frequency (s):");
+                    ui.add(egui::Slider::new(&mut self.update_frequency, 0.1..=2.0));
+                });
+                ui.horizontal(|ui| {
+                    ui.label("Grid Edge Length:");
+                    let mut new_grid_length = self.grid_length as i32;
+                    ui.add(egui::Slider::new(&mut new_grid_length, 10..=100));
+                    if new_grid_length != self.grid_length as i32 {
+                        self.resize_grid(new_grid_length as usize);
+                        self.is_playing = false;
+                    }
+                });
+
+                // Add history slider if there is history
+                if !self.history.is_empty() {
+                    ui.horizontal(|ui| {
+                        ui.label("History:");
+                        let mut history_slider_value = self.history_index as i32;
+                        ui.add(egui::Slider::new(&mut history_slider_value, 0..=self.history.len() as i32 - 1));
+                        if history_slider_value != self.history_index as i32 {
+                            self.history_index = history_slider_value as usize;
+                            self.grid = self.history[self.history_index].clone();
+                        }
+                    });
+                }
+            });
+
+            // Play, Pause, and Clear buttons
             ui.horizontal(|ui| {
                 if ui.button("Play").clicked() {
                     self.is_playing = true;
@@ -168,33 +198,10 @@ impl App for GameOfLifeApp {
                     self.clear_grid();
                     self.is_playing = false;
                 }
-
-                // Display game state
-                ui.label(if self.is_playing { "Playing" } else { "Paused" });
-
-                ui.add(egui::Slider::new(&mut self.update_frequency, 0.1..=2.0).text("Update frequency (s)"));
-
-                // Add a slider for grid length
-                let mut new_grid_length = self.grid_length as i32;
-                ui.add(egui::Slider::new(&mut new_grid_length, 10..=100).text("Grid Edge Length"));
-                if new_grid_length != self.grid_length as i32 {
-                    self.resize_grid(new_grid_length as usize);
-                    self.is_playing = false;
-                }
-
-                let history_len = self.history.len();
-                if history_len > 0 {
-                    let mut history_slider_value = self.history_index as i32;
-                    ui.add(egui::Slider::new(&mut history_slider_value, 0..=(history_len as i32 - 1)).text("History"));
-                    if history_slider_value != self.history_index as i32 {
-                        self.history_index = history_slider_value as usize;
-                        self.grid = self.history[self.history_index].clone();
-                    }
-                }
             });
 
             let now = get_current_time();
-            // Check if more than one second has passed and game is playing
+            // Check if more than the update frequency time has passed and game is playing
             if self.is_playing && (now - self.last_update) >= self.update_frequency as f64 {
                 self.update_game_state();
                 self.last_update = now; // Reset the timer
@@ -205,6 +212,7 @@ impl App for GameOfLifeApp {
         ctx.request_repaint();
     }
 }
+
 
 #[cfg(target_arch = "wasm32")]
 mod wasm {
